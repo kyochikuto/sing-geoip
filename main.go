@@ -182,15 +182,6 @@ func release(binary []byte, output string, sourceName string, ruleSetOutput stri
 		return err
 	}
 
-	writer, err = newWriter(metadata, []string{"cn"})
-	if err != nil {
-		return err
-	}
-	err = write(writer, countryMap, "geoip-cn.db", []string{"cn"})
-	if err != nil {
-		return err
-	}
-
 	os.RemoveAll(ruleSetOutput)
 	err = os.MkdirAll(ruleSetOutput, 0o755)
 	if err != nil {
