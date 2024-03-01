@@ -163,25 +163,7 @@ func write(writer *mmdbwriter.Tree, dataMap map[string][]*net.IPNet, output stri
 	return err
 }
 
-func release(source string, destination string, output string, ruleSetOutput string) error {
-	sourceRelease, err := fetch(source)
-	if err != nil {
-		return err
-	}
-	destinationRelease, err := fetch(destination)
-	if err != nil {
-		log.Warn("missing destination latest release")
-	} else {
-		if os.Getenv("NO_SKIP") != "true" && strings.Contains(*destinationRelease.Name, *sourceRelease.Name) {
-			log.Info("already latest")
-			setActionOutput("skip", "true")
-			return nil
-		}
-	}
-	binary, err := download(sourceRelease)
-	if err != nil {
-		return err
-	}
+func release(binary []byte, output string, sourceName string, ruleSetOutput string) error {
 	metadata, countryMap, err := parse(binary)
 	if err != nil {
 		return err
@@ -241,7 +223,7 @@ func release(source string, destination string, output string, ruleSetOutput str
 		outputRuleSet.Close()
 	}
 
-	setActionOutput("tag", *sourceRelease.Name)
+	setActionOutput("tag", sourceName)
 	return nil
 }
 
@@ -249,8 +231,52 @@ func setActionOutput(name string, content string) {
 	os.Stdout.WriteString("::set-output name=" + name + "::" + content + "\n")
 }
 
+func remote(source string, destination string, output string, ruleSetOutput string) error {
+	sourceRelease, err := fetch(source)
+	if err != nil {
+		return err
+	}
+	destinationRelease, err := fetch(destination)
+	if err != nil {
+		log.Warn("missing destination latest release")
+	} else {
+		if os.Getenv("NO_SKIP") != "true" && strings.Contains(*destinationRelease.Name, *sourceRelease.Name) {
+			log.Info("already latest")
+			setActionOutput("skip", "true")
+			return nil
+		}
+	}
+	binary, err := download(sourceRelease)
+	if err != nil {
+		return err
+	}
+
+	err = release(binary, output, *sourceRelease.Name, ruleSetOutput)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func local(input string, output string, sourceName string, ruleSetOutput string) error {
+	data, err := os.ReadFile(input)
+	if err != nil {
+		return err
+	}
+	err = release(data, output, sourceName, ruleSetOutput)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
-	err := release("Dreamacro/maxmind-geoip", "sagernet/sing-geoip", "geoip.db", "rule-set")
+	var err error
+	if len(os.Args) >= 4 {
+		err = local(os.Args[1], os.Args[2], os.Args[3], os.Args[4])
+	} else {
+		err = remote("Dreamacro/maxmind-geoip", "sagernet/sing-geoip", "geoip.db", "rule-set")
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
